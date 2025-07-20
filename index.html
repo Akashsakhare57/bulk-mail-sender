@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bulk Mail Sender</title>
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}" type="image/x-icon">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom Styles */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f2f5;
+        }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        
+        .card {
+            background-color: white;
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            font-weight: 500;
+            transition: all 0.2s ease-in-out;
+            cursor: pointer;
+        }
+        .btn-primary {
+            background-color: #4f46e5;
+            color: white;
+        }
+        .btn-primary:hover {
+            background-color: #4338ca;
+        }
+        .btn-secondary {
+            background-color: #e5e7eb;
+            color: #1f2937;
+        }
+        .btn-secondary:hover {
+            background-color: #d1d5db;
+        }
+        .btn-danger {
+            background-color: #ef4444;
+            color: white;
+        }
+        .btn-danger:hover {
+            background-color: #dc2626;
+        }
+
+        #logs-window {
+            height: 200px;
+            background-color: #1f2937;
+            color: #d1d5db;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 0.875rem;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 50;
+        }
+        .modal-content {
+            background-color: white;
+            padding: 2rem;
+            border-radius: 0.75rem;
+            width: 90%;
+            max-width: 600px;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <div id="connection-error-banner" class="hidden fixed top-0 left-0 right-0 bg-red-600 text-white p-4 text-center z-50 shadow-lg">
+        <strong>Connection Error:</strong> Could not connect to the backend server. Please ensure the `app.py` script is running in your terminal.
+        <button id="retry-connection-btn" class="ml-4 bg-white text-red-600 font-bold py-1 px-3 rounded-md text-sm">Retry</button>
+    </div>
+
+    <div id="credentials-view" class="max-w-md mx-auto mt-16">
+        <div class="card">
+            <h1 class="text-2xl font-bold text-gray-800 mb-4 text-center">Professional Bulk Mail Sender</h1>
+            <p class="text-sm text-gray-500 mb-6 text-center">Enter your Gmail address and an App Password to begin.</p>
+            <div class="space-y-4">
+                <div>
+                    <label for="email" class="block text-sm font-medium text-gray-700">Gmail Address</label>
+                    <input type="email" id="email" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="you@gmail.com">
+                </div>
+                <div>
+                    <label for="password" class="block text-sm font-medium text-gray-700">App Password</label>
+                    <input type="password" id="password" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm" placeholder="••••••••••••••••">
+                    <p class="mt-2 text-xs text-gray-500">Must be 16 characters, without spaces.</p>
+                </div>
+                <button id="save-credentials-btn" class="btn btn-primary w-full">Save and Continue</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="main-view" class="hidden max-w-4xl mx-auto">
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-3xl font-bold text-gray-800">Bulk Mail Dashboard</h1>
+            <button id="reset-account-btn" class="btn btn-secondary">Reset Account</button>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <!-- Left Column -->
+            <div class="md:col-span-2 space-y-6">
+                <!-- Resume Management -->
+                <div class="card">
+                    <h2 class="text-xl font-semibold text-gray-700 mb-4">Resume / Proposal Attachment (PDF)</h2>
+                    <div class="flex items-center space-x-2 mb-4">
+                        <input type="file" id="resume-upload" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100" accept=".pdf">
+                        <button id="upload-resume-btn" class="btn btn-secondary">Upload</button>
+                    </div>
+                    <div id="resume-display" class="space-y-2">
+                        <!-- Resume info will be injected here -->
+                    </div>
+                </div>
+
+                <!-- File Management -->
+                <div class="card">
+                    <h2 class="text-xl font-semibold text-gray-700 mb-4">CSV/Excel File Management</h2>
+                    <div class="flex items-center space-x-2 mb-4">
+                        <input type="file" id="file-upload" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100" accept=".csv,.xlsx,.xls">
+                        <button id="upload-btn" class="btn btn-secondary">Upload</button>
+                    </div>
+                    <div id="file-list" class="space-y-2">
+                        <!-- File items will be injected here by JS -->
+                    </div>
+                </div>
+
+                <!-- Email Template -->
+                <div class="card">
+                    <h2 class="text-xl font-semibold text-gray-700 mb-4">Email Template</h2>
+                     <p id="current-template-display" class="text-sm text-gray-500 mb-4">No custom template saved. Using default.</p>
+                    <button id="edit-template-btn" class="btn btn-secondary">Edit / Select Template</button>
+                </div>
+            </div>
+
+            <!-- Right Column -->
+            <div class="md:col-span-1 space-y-6">
+                <!-- Counter & Control -->
+                <div class="card">
+                    <h2 class="text-xl font-semibold text-gray-700 mb-2">Counter & Control</h2>
+                    <div class="text-center my-4">
+                        <p class="text-lg text-gray-500">Emails Sent</p>
+                        <p id="counter-display" class="text-5xl font-bold text-indigo-600">0</p>
+                    </div>
+                    <div class="space-y-3">
+                        <div>
+                            <label for="stopper-input" class="block text-sm font-medium text-gray-700">Batch Size (Stopper)</label>
+                            <div class="flex space-x-2">
+                                <input type="number" id="stopper-input" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm sm:text-sm" value="100">
+                                <button id="set-stopper-btn" class="btn btn-secondary">Set</button>
+                            </div>
+                        </div>
+                        <button id="reset-counter-btn" class="btn btn-danger w-full">Reset Counter to 0</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Start Sending & Logs -->
+        <div class="card mt-6">
+             <h2 class="text-xl font-semibold text-gray-700 mb-4">System Console</h2>
+             <button id="start-sending-btn" class="btn btn-primary w-full text-lg py-3 mb-4">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
+                Start Sending Emails
+            </button>
+            <div id="logs-window"></div>
+        </div>
+    </div>
+
+    <!-- Template Editor Modal -->
+    <div id="template-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <h2 class="text-2xl font-bold mb-4">Email Template Editor</h2>
+            <div class="space-y-4">
+                <div>
+                    <label for="template-select" class="block text-sm font-medium text-gray-700">Load a Preset</label>
+                    <select id="template-select" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm sm:text-sm">
+                        <!-- Options will be loaded by JS -->
+                    </select>
+                </div>
+                <div>
+                    <label for="template-subject" class="block text-sm font-medium text-gray-700">Email Subject</label>
+                    <input type="text" id="template-subject" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm sm:text-sm">
+                </div>
+                 <div>
+                    <label for="template-body" class="block text-sm font-medium text-gray-700">Email Body</label>
+                    <p class="text-xs text-gray-500">Use `{greeting}` as a placeholder for the recipient's name.</p>
+                    <textarea id="template-body" rows="12" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm sm:text-sm"></textarea>
+                </div>
+            </div>
+            <div class="mt-6 flex justify-end space-x-3">
+                <button id="cancel-template-btn" class="btn btn-secondary">Cancel</button>
+                <button id="save-template-btn" class="btn btn-primary">Save and Use</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- Configuration ---
+            const BASE_URL = 'http://127.0.0.1:5001';
+
+            // --- Element Selectors ---
+            const errorBanner = document.getElementById('connection-error-banner');
+            const retryBtn = document.getElementById('retry-connection-btn');
+            const credentialsView = document.getElementById('credentials-view');
+            const mainView = document.getElementById('main-view');
+            const saveCredentialsBtn = document.getElementById('save-credentials-btn');
+            const emailInput = document.getElementById('email');
+            const passwordInput = document.getElementById('password');
+            const resetAccountBtn = document.getElementById('reset-account-btn');
+
+            const resumeUploadInput = document.getElementById('resume-upload');
+            const uploadResumeBtn = document.getElementById('upload-resume-btn');
+            const resumeDisplayDiv = document.getElementById('resume-display');
+
+            const fileUploadInput = document.getElementById('file-upload');
+            const uploadBtn = document.getElementById('upload-btn');
+            const fileListDiv = document.getElementById('file-list');
+
+            const editTemplateBtn = document.getElementById('edit-template-btn');
+            const templateModal = document.getElementById('template-modal');
+            const cancelTemplateBtn = document.getElementById('cancel-template-btn');
+            const saveTemplateBtn = document.getElementById('save-template-btn');
+            const templateSelect = document.getElementById('template-select');
+            const templateSubjectInput = document.getElementById('template-subject');
+            const templateBodyInput = document.getElementById('template-body');
+            const currentTemplateDisplay = document.getElementById('current-template-display');
+
+            const counterDisplay = document.getElementById('counter-display');
+            const stopperInput = document.getElementById('stopper-input');
+            const setStopperBtn = document.getElementById('set-stopper-btn');
+            const resetCounterBtn = document.getElementById('reset-counter-btn');
+
+            const startSendingBtn = document.getElementById('start-sending-btn');
+            const logsWindow = document.getElementById('logs-window');
+            
+            let logInterval;
+
+            // --- API Functions ---
+            const api = {
+                async post(endpoint, body = {}) { // Add default empty body
+                    try {
+                        const response = await fetch(`${BASE_URL}${endpoint}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(body)
+                        });
+                        if (!response.ok) {
+                            const errorData = await response.json();
+                            throw new Error(errorData.error || 'An unknown error occurred');
+                        }
+                        errorBanner.classList.add('hidden'); // Hide banner on success
+                        return await response.json();
+                    } catch (error) {
+                        if (error instanceof TypeError && error.message === 'Failed to fetch') {
+                             errorBanner.classList.remove('hidden');
+                        } else {
+                            alert(`Error: ${error.message}`);
+                        }
+                        console.error('API POST Error:', error);
+                    }
+                },
+                async get(endpoint) {
+                    try {
+                        const response = await fetch(`${BASE_URL}${endpoint}`);
+                         if (!response.ok) {
+                            const errorData = await response.json();
+                            throw new Error(errorData.error || 'An unknown error occurred');
+                        }
+                        errorBanner.classList.add('hidden'); // Hide banner on success
+                        return await response.json();
+                    } catch (error) {
+                        if (error instanceof TypeError && error.message === 'Failed to fetch') {
+                             errorBanner.classList.remove('hidden');
+                        } else {
+                            alert(`Error: ${error.message}`);
+                        }
+                        console.error('API GET Error:', error);
+                    }
+                }
+            };
+
+            // --- UI Update Functions ---
+            const updateResumeDisplay = async () => {
+                const data = await api.get('/api/resume');
+                resumeDisplayDiv.innerHTML = '';
+                if (data && data.resume_file) {
+                    const resumeEl = document.createElement('div');
+                    resumeEl.className = 'p-2 rounded-md flex items-center justify-between bg-indigo-100';
+                    resumeEl.innerHTML = `
+                        <span class="font-medium text-sm text-indigo-800">${data.resume_file} (Active)</span>
+                        <button class="btn btn-danger btn-sm" id="delete-resume-btn">Delete</button>
+                    `;
+                    resumeDisplayDiv.appendChild(resumeEl);
+                } else {
+                    resumeDisplayDiv.innerHTML = '<p class="text-sm text-gray-500">No resume uploaded. Emails will be sent without an attachment.</p>';
+                }
+            };
+
+            const updateFileList = async () => {
+                const data = await api.get('/api/files');
+                if (!data) return;
+                
+                fileListDiv.innerHTML = '';
+                if (data.files.length === 0) {
+                    fileListDiv.innerHTML = '<p class="text-sm text-gray-500">No files uploaded yet.</p>';
+                    return;
+                }
+
+                data.files.forEach(file => {
+                    const isDefault = file === data.default_file;
+                    const fileEl = document.createElement('div');
+                    fileEl.className = `p-2 rounded-md flex items-center justify-between ${isDefault ? 'bg-indigo-100' : 'bg-gray-50'}`;
+                    fileEl.innerHTML = `
+                        <span class="font-medium text-sm ${isDefault ? 'text-indigo-800' : 'text-gray-800'}">${file} ${isDefault ? '(Default)' : ''}</span>
+                        <div class="space-x-2">
+                            ${!isDefault ? `<button class="btn btn-secondary btn-sm" data-action="set-default" data-filename="${file}">Set Default</button>` : ''}
+                            <button class="btn btn-danger btn-sm" data-action="delete" data-filename="${file}">Delete</button>
+                        </div>
+                    `;
+                    fileListDiv.appendChild(fileEl);
+                });
+            };
+
+            const updateStatus = async () => {
+                const data = await api.get('/api/status');
+                if (!data) return;
+                counterDisplay.textContent = data.counter;
+                stopperInput.value = data.stopper;
+                if(data.email) {
+                    credentialsView.classList.add('hidden');
+                    mainView.classList.remove('hidden');
+                } else {
+                     credentialsView.classList.remove('hidden');
+                    mainView.classList.add('hidden');
+                }
+            };
+            
+            const updateLogs = async () => {
+                const data = await api.get('/api/logs');
+                if(data && Array.isArray(data.logs)) {
+                    logsWindow.innerHTML = data.logs.join('\n');
+                    logsWindow.scrollTop = logsWindow.scrollHeight;
+                }
+            };
+            
+            const startLogPolling = () => {
+                if(logInterval) clearInterval(logInterval);
+                logInterval = setInterval(updateLogs, 2000); // Poll every 2 seconds
+            };
+
+            const stopLogPolling = () => {
+                if(logInterval) clearInterval(logInterval);
+            };
+
+            // --- Event Listeners ---
+
+            retryBtn.addEventListener('click', () => {
+                errorBanner.classList.add('hidden');
+                initializeApp();
+            });
+            
+            resetAccountBtn.addEventListener('click', async () => {
+                if (confirm('Are you sure you want to reset your account credentials? This will log you out.')) {
+                    const result = await api.post('/api/credentials/clear');
+                    if (result) {
+                        emailInput.value = '';
+                        passwordInput.value = '';
+                        mainView.classList.add('hidden');
+                        credentialsView.classList.remove('hidden');
+                    }
+                }
+            });
+
+            saveCredentialsBtn.addEventListener('click', async () => {
+                const email = emailInput.value;
+                const password = passwordInput.value.replace(/\s/g, ''); // Remove spaces
+
+                if (!email) {
+                    alert('Please provide an email address.');
+                    return;
+                }
+                
+                // This is the new validation block
+                if (password.length !== 16) {
+                    alert('App Password must be exactly 16 characters long.');
+                    passwordInput.focus(); // Puts the cursor back in the password box
+                    passwordInput.classList.add('border-red-500'); // Highlights the box in red
+                    return;
+                }
+                passwordInput.classList.remove('border-red-500'); // Removes red highlight if correct
+                
+                const result = await api.post('/api/save-credentials', { email, password });
+                if (result && result.success) {
+                    credentialsView.classList.add('hidden');
+                    mainView.classList.remove('hidden');
+                    initializeApp();
+                }
+            });
+
+            uploadResumeBtn.addEventListener('click', async () => {
+                const file = resumeUploadInput.files[0];
+                if (!file) {
+                    alert('Please select a PDF file to upload.');
+                    return;
+                }
+                const formData = new FormData();
+                formData.append('file', file);
+
+                try {
+                    const response = await fetch(`${BASE_URL}/api/resume/upload`, {
+                        method: 'POST',
+                        body: formData
+                    });
+                    const result = await response.json();
+                    if (response.ok) {
+                        alert('Resume uploaded successfully!');
+                        updateResumeDisplay();
+                    } else {
+                        throw new Error(result.error);
+                    }
+                } catch (error) {
+                    alert(`Upload failed: ${error.message}`);
+                }
+            });
+
+            resumeDisplayDiv.addEventListener('click', async (e) => {
+                if (e.target.id === 'delete-resume-btn') {
+                    if (confirm('Are you sure you want to delete the resume?')) {
+                        await api.post('/api/resume/delete');
+                        updateResumeDisplay();
+                    }
+                }
+            });
+
+            uploadBtn.addEventListener('click', async () => {
+                const file = fileUploadInput.files[0];
+                if (!file) {
+                    alert('Please select a file to upload.');
+                    return;
+                }
+                const formData = new FormData();
+                formData.append('file', file);
+
+                try {
+                    const response = await fetch(`${BASE_URL}/api/upload`, {
+                        method: 'POST',
+                        body: formData
+                    });
+                    const result = await response.json();
+                    if (response.ok) {
+                        alert('File uploaded successfully!');
+                        updateFileList();
+                    } else {
+                        throw new Error(result.error);
+                    }
+                } catch (error) {
+                    alert(`Upload failed: ${error.message}`);
+                }
+            });
+
+            fileListDiv.addEventListener('click', async (e) => {
+                const target = e.target.closest('button');
+                if (!target) return;
+
+                const action = target.dataset.action;
+                const filename = target.dataset.filename;
+
+                if (action === 'set-default') {
+                    await api.post('/api/files/set-default', { filename });
+                } else if (action === 'delete') {
+                    if (confirm(`Are you sure you want to delete ${filename}?`)) {
+                        await api.post('/api/files/delete', { filename });
+                    }
+                }
+                updateFileList();
+            });
+
+            editTemplateBtn.addEventListener('click', async () => {
+                const data = await api.get('/api/templates');
+                if(!data) return;
+
+                // Populate presets
+                templateSelect.innerHTML = '<option value="">-- Select a Preset --</option>';
+                for (const name in data.templates) {
+                    const option = document.createElement('option');
+                    option.value = name;
+                    option.textContent = name.charAt(0).toUpperCase() + name.slice(1);
+                    templateSelect.appendChild(option);
+                }
+
+                // Load current saved template or default
+                const current = data.current_template;
+                if (current && current.subject) {
+                    templateSubjectInput.value = current.subject;
+                    templateBodyInput.value = current.body;
+                } else {
+                    templateSubjectInput.value = data.templates.default.subject;
+                    templateBodyInput.value = data.templates.default.body;
+                }
+
+                templateModal.classList.remove('hidden');
+            });
+            
+            templateSelect.addEventListener('change', async (e) => {
+                const templateName = e.target.value;
+                if(!templateName) return;
+                
+                const data = await api.get('/api/templates');
+                if(data && data.templates[templateName]) {
+                    templateSubjectInput.value = data.templates[templateName].subject;
+                    templateBodyInput.value = data.templates[templateName].body;
+                }
+            });
+
+            cancelTemplateBtn.addEventListener('click', () => templateModal.classList.add('hidden'));
+
+            saveTemplateBtn.addEventListener('click', async () => {
+                const name = templateSelect.value || 'custom';
+                const subject = templateSubjectInput.value;
+                const body = templateBodyInput.value;
+                const result = await api.post('/api/templates/save', { name, subject, body });
+                if (result && result.success) {
+                    alert('Template saved!');
+                    templateModal.classList.add('hidden');
+                    currentTemplateDisplay.textContent = `Using custom template: "${subject}"`;
+                }
+            });
+
+            setStopperBtn.addEventListener('click', async () => {
+                const value = stopperInput.value;
+                await api.post('/api/stopper', { value });
+                alert('Batch size updated!');
+            });
+
+            resetCounterBtn.addEventListener('click', async () => {
+                if (confirm('Are you sure you want to reset the counter to 0?')) {
+                    await api.post('/api/counter/reset');
+                    updateStatus();
+                }
+            });
+
+            startSendingBtn.addEventListener('click', async () => {
+                if(confirm('Are you sure you want to start sending emails? Please confirm all settings are correct.')) {
+                    startSendingBtn.disabled = true;
+                    startSendingBtn.classList.replace('btn-primary', 'btn-secondary');
+                    startSendingBtn.innerHTML = 'Sending...';
+                    
+                    logsWindow.innerHTML = 'Initiating...';
+                    await api.post('/api/send');
+                    startLogPolling();
+
+                    // This is a simple way to re-enable the button. A better way would be a status check.
+                    setTimeout(() => {
+                        startSendingBtn.disabled = false;
+                        startSendingBtn.classList.replace('btn-secondary', 'btn-primary');
+                        startSendingBtn.innerHTML = 'Start Sending Emails';
+                        stopLogPolling();
+                        updateStatus();
+                        alert('Email batch process finished. Check logs for details.');
+                    }, (parseInt(stopperInput.value) * 5 + 10) * 1000); // Estimate time based on stopper + buffer
+                }
+            });
+
+
+            // --- Initialization ---
+            const initializeApp = () => {
+                updateStatus();
+                updateFileList();
+                updateResumeDisplay();
+                updateLogs();
+                api.get('/api/templates').then(data => {
+                    if (data && data.current_template && data.current_template.subject) {
+                        currentTemplateDisplay.textContent = `Using custom template: "${data.current_template.subject}"`;
+                    }
+                });
+            };
+
+            initializeApp();
+        });
+    </script>
+</body>
+</html>
