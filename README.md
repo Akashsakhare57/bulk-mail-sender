@@ -73,7 +73,7 @@ A powerful, self-hosted web application for sending personalized bulk emails wit
 ### 3. Install Required Packages
 Navigate to the project directory in your terminal:
 ```bash
-pip install -r requirements.txt
+pip install -r requirements.txt 
 ```
 
 ### 4. Set Up Gmail App Password (Required)
